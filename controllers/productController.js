@@ -78,3 +78,86 @@ const productValidationSchema = Joi.object({
   isActive: Joi.boolean().default(true)
 });
 
+
+// Get all products with pagination and filtering
+exports.getProducts = async (req, res) => {
+  try {
+    const {
+      page = 0,
+      limit = 45,
+      sort = 'relevance',
+      search,
+      category,
+      brand,
+      minPrice,
+      maxPrice,
+      minRating
+    } = req.query;
+
+    // Build query object
+    const query = { isActive: true };
+
+    if (search) {
+      query.$text = { $search: search };
+    }
+
+    if (category) {
+      query.brickName = category;
+    }
+
+    if (brand) {
+      query.brandTypeName = brand;
+    }
+
+    if (minPrice || maxPrice) {
+      query['price.value'] = {};
+      if (minPrice) query['price.value'].$gte = Number(minPrice);
+      if (maxPrice) query['price.value'].$lte = Number(maxPrice);
+    }
+
+    if (minRating) {
+      query.averageRating = { $gte: Number(minRating) };
+    }
+
+    // Build sort object
+    let sortObj = {};
+    switch (sort) {
+      case 'price_low':
+        sortObj = { 'price.value': 1 };
+        break;
+      case 'price_high':
+        sortObj = { 'price.value': -1 };
+        break;
+      case 'rating':
+        sortObj = { averageRating: -1 };
+        break;
+      case 'newest':
+        sortObj = { createdAt: -1 };
+        break;
+      default:
+        sortObj = { createdAt: -1 };
+    }
+
+    const skip = page * limit;
+    const products = await Product.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(Number(limit));
+
+    const totalResults = await Product.countDocuments(query);
+    const totalPages = Math.ceil(totalResults / limit);
+
+    res.json({
+      products,
+      pagination: {
+        pageSize: Number(limit),
+        currentPage: Number(page),
+        totalResults,
+        totalPages,
+        sort
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
