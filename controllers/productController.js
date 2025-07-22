@@ -161,3 +161,23 @@ exports.getProducts = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Get product by ID or code
+exports.getProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findOne({
+      $or: [{ _id: id }, { code: id }],
+      isActive: true
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    res.json(product);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
